@@ -11,12 +11,14 @@ namespace RestfulTestful.SQLiteModels
     public class Product
     {
         [PrimaryKey, AutoIncrement]
-        public int ID { get; set; }
+        public long ID { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
-        public int Quantity { get; set; }
+        public long Quantity { get; set; }
         public double Price { get; set; }
         public double Discount { get; set; }
+        public bool Discontinued { get; set; }
+        public long TokenNumber { get; set; }
         [OneToMany(CascadeOperations = CascadeOperation.All)]
         public List<Sale> Sales { get; set; }
     }

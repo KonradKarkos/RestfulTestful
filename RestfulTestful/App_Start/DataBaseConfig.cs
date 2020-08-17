@@ -20,6 +20,7 @@ namespace RestfulTestful.App_Start
             db.CreateTable<Product>();
             db.CreateTable<Client>();
             db.CreateTable<Sale>();
+            db.CreateTable<User>();
         }
         public static bool Hacked { get; private set; }
 
@@ -31,22 +32,18 @@ namespace RestfulTestful.App_Start
             {
                 const string runtimeFolderName = "/runtimes";
 
-                var destinationPath = typeof(SQLitePCL.raw).Assembly.Location
-                    .Replace("\\", "/");
+                var destinationPath = typeof(SQLitePCL.raw).Assembly.Location.Replace("\\", "/");
                 var destinationLength = destinationPath.LastIndexOf("/", StringComparison.OrdinalIgnoreCase);
                 var destinationDirectory = destinationPath.Substring(0, destinationLength) + runtimeFolderName;
 
-                var sourcePath = new Uri(typeof(SQLitePCL.raw).Assembly.CodeBase)
-                    .AbsolutePath;
+                var sourcePath = new Uri(typeof(SQLitePCL.raw).Assembly.CodeBase).AbsolutePath;
                 var sourceLength = sourcePath.LastIndexOf("/", StringComparison.OrdinalIgnoreCase);
                 var sourceDirectory = sourcePath.Substring(0, sourceLength) + runtimeFolderName;
 
-                if (Directory.Exists(sourceDirectory))
-                    CopyFilesRecursively(new DirectoryInfo(sourceDirectory), new DirectoryInfo(destinationDirectory));
+                if (Directory.Exists(sourceDirectory))CopyFilesRecursively(new DirectoryInfo(sourceDirectory), new DirectoryInfo(destinationDirectory));
             }
             catch (Exception ex)
             {
-                //Ignore Exception
                 Debug.WriteLine(ex.Message);
                 return false;
             }
@@ -54,13 +51,12 @@ namespace RestfulTestful.App_Start
             return (Hacked = true);
         }
 
-        private static void CopyFilesRecursively(
-            DirectoryInfo source,
-            DirectoryInfo target
-        )
+        private static void CopyFilesRecursively(DirectoryInfo source, DirectoryInfo target)
         {
             foreach (var dir in source.GetDirectories())
+            {
                 CopyFilesRecursively(dir, target.CreateSubdirectory(dir.Name));
+            }
 
             foreach (var file in source.GetFiles())
             {
@@ -72,7 +68,6 @@ namespace RestfulTestful.App_Start
                 }
                 catch (Exception ex)
                 {
-                    //Ignore Exception
                     Debug.WriteLine(ex.Message);
                 }
             }

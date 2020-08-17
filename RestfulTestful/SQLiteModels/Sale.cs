@@ -11,15 +11,18 @@ namespace RestfulTestful.SQLiteModels
     public class Sale
     {
         [PrimaryKey, AutoIncrement]
-        public int ID { get; set; }
+        public long ID { get; set; }
         [ForeignKey(typeof(Product))]
-        public int ProductID { get; set; }
+        public long ProductID { get; set; }
         [ForeignKey(typeof(Client))]
-        public int ClientID { get; set; }
-        public int Quantity { get; set; }
+        public long ClientID { get; set; }
+        public long Quantity { get; set; }
         public bool Payed { get; set; }
         public bool Archieved { get; set; }
         public double Discount { get; set; }
+        public DateTime SaleDate { get; set; }
+        public DateTime AddDate { get; set; }
+        public long TokenNumber { get; set; }
         [ManyToOne]
         public Product Product { get; set; }
         [ManyToOne]

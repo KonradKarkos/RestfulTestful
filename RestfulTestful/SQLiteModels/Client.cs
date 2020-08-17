@@ -13,12 +13,13 @@ namespace RestfulTestful.SQLiteModels
     public class Client
     {
         [PrimaryKey, AutoIncrement]
-        public int ID { get; set; }
+        public long ID { get; set; }
         public string Name { get; set; }
         public string Surname { get; set; }
-        public int PhoneNumber { get; set; }
+        public long PhoneNumber { get; set; }
         public string Address { get; set; }
         public bool Deleted { get; set; }
+        public long TokenNumber { get; set; }
         [OneToMany(CascadeOperations = CascadeOperation.All)]
         public List<Sale> Sales { get; set; }
     }

@@ -1,129 +1,146 @@
-﻿using System;
+﻿using Microsoft.Ajax.Utilities;
+using RestfulTestful.SQLiteModels;
+using SQLite;
+using SQLiteNetExtensions.Extensions;
+using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using System.Web.Http.ModelBinding;
 using System.Web.Http.OData;
-using System.Web.Http.OData.Query;
-using System.Web.Http.OData.Routing;
-using RestfulTestful.SQLiteModels;
-using Microsoft.Data.OData;
 
 namespace RestfulTestful.Controllers
 {
-    /*
-    The WebApiConfig class may require additional changes to add a route for this controller. Merge these statements into the Register method of the WebApiConfig class as applicable. Note that OData URLs are case sensitive.
-
-    using System.Web.Http.OData.Builder;
-    using System.Web.Http.OData.Extensions;
-    using RestfulTestful.SQLiteModels;
-    ODataConventionModelBuilder builder = new ODataConventionModelBuilder();
-    builder.EntitySet<Client>("Clients");
-    config.Routes.MapODataServiceRoute("odata", "odata", builder.GetEdmModel());
-    */
-    public class ClientsController : ODataController
+    [Authorize]
+    public class ClientsController : ApiController
     {
-        private static ODataValidationSettings _validationSettings = new ODataValidationSettings();
-
-        // GET: odata/Clients
-        public IHttpActionResult GetClients(ODataQueryOptions<Client> queryOptions)
+        // GET: api/Clients
+        [EnableQuery]
+        public IHttpActionResult Get()
         {
-            // validate the query.
-            try
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Client>().Any())
             {
-                queryOptions.Validate(_validationSettings);
+                return Ok<IEnumerable<Client>>(db.Table<Client>().ToList());
             }
-            catch (ODataException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-
-            // return Ok<IEnumerable<Client>>(clients);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
 
-        // GET: odata/Clients(5)
-        public IHttpActionResult GetClient([FromODataUri] int key, ODataQueryOptions<Client> queryOptions)
+        // GET: api/Clients/5
+        public IHttpActionResult Get(int id)
         {
-            // validate the query.
-            try
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if(db.Table<Client>().Where(c => c.ID.Equals(id)).Any())
             {
-                queryOptions.Validate(_validationSettings);
+                return Ok<Client>(db.GetAllWithChildren<Client>().First(c => c.ID.Equals(id)));
             }
-            catch (ODataException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-
-            // return Ok<Client>(client);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
 
-        // PUT: odata/Clients(5)
-        public IHttpActionResult Put([FromODataUri] int key, Delta<Client> delta)
+        // POST: api/Clients
+        public IHttpActionResult Post([FromBody]Client client)
         {
-            Validate(delta.GetEntity());
-
-            if (!ModelState.IsValid)
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            client.TokenNumber = 1;
+            if(db.Insert(client) == 1)
             {
-                return BadRequest(ModelState);
+                return Ok<Client>(db.GetAllWithChildren<Client>().Last(c => c.Name.Equals(client.Name) && c.Surname.Equals(client.Surname)));
             }
-
-            // TODO: Get the entity here.
-
-            // delta.Put(client);
-
-            // TODO: Save the patched entity.
-
-            // return Updated(client);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return InternalServerError();
         }
 
-        // POST: odata/Clients
-        public IHttpActionResult Post(Client client)
+        // PUT: api/Clients/5
+        public IHttpActionResult Put(int id, [FromBody]Delta<Client> delta)
         {
-            if (!ModelState.IsValid)
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Client>().Where(c => c.ID.Equals(id)).Any())
             {
-                return BadRequest(ModelState);
+                Client client = db.GetAllWithChildren<Client>().First(c => c.ID.Equals(id));
+                object requestToken = null;
+                if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
+                {
+                    if (client.TokenNumber.Equals((long)requestToken))
+                    {
+                        client.TokenNumber++;
+                        if (db.Update(client) == 1)
+                        {
+                            return Ok<Client>(client);
+                        }
+                        return InternalServerError(new Exception("Couldn't update row."));
+                    }
+                    return BadRequest("Wrong token value.");
+                }
+                return InternalServerError(new Exception("Error during getting token value."));
             }
-
-            // TODO: Add create logic here.
-
-            // return Created(client);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
+        }
+        public IHttpActionResult Patch(int id, [FromBody]Delta<Client> delta)
+        {
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Client>().Where(c => c.ID.Equals(id)).Any())
+            {
+                Client client = db.GetAllWithChildren<Client>().First(c => c.ID.Equals(id));
+                object requestToken = null;
+                if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
+                {
+                    if (client.TokenNumber.Equals((long)requestToken))
+                    {
+                        delta.Patch(client);
+                        client.TokenNumber++;
+                        if (db.Update(client) == 1)
+                        {
+                            return Ok<Client>(client);
+                        }
+                        return InternalServerError(new Exception("Couldn't update row."));
+                    }
+                    return BadRequest("Wrong token value.");
+                }
+                return InternalServerError(new Exception("Error during getting token value."));
+            }
+            return NotFound();
         }
 
-        // PATCH: odata/Clients(5)
-        [AcceptVerbs("PATCH", "MERGE")]
-        public IHttpActionResult Patch([FromODataUri] int key, Delta<Client> delta)
+        // DELETE: api/Clients/5
+        public IHttpActionResult Delete(int id, [FromBody]Delta<Client> delta)
         {
-            Validate(delta.GetEntity());
-
-            if (!ModelState.IsValid)
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Client>().Where(c => c.ID.Equals(id)).Any())
             {
-                return BadRequest(ModelState);
+                Client client = db.GetAllWithChildren<Client>().First(c => c.ID.Equals(id));
+                object requestToken = null;
+                if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
+                {
+                    if (client.TokenNumber.Equals((long)requestToken))
+                    {
+                        foreach (Sale s in client.Sales)
+                        {
+                            if (!s.Payed && !s.Archieved)
+                            {
+                                return InternalServerError(new Exception("Cannot delete client with unpaid sales."));
+                            }
+                        }
+                        client.Deleted = true;
+                        client.TokenNumber++;
+                        for (int i = 0; i < client.Sales.Count; i++)
+                        {
+                            client.Sales[i].Archieved = true;
+                            client.Sales[i].TokenNumber++;
+                        }
+                        db.UpdateWithChildren(client);
+                        return Ok<Client>(client);
+                    }
+                    return BadRequest("Wrong token value.");
+                }
+                return InternalServerError(new Exception("Error during getting token value."));
             }
-
-            // TODO: Get the entity here.
-
-            // delta.Patch(client);
-
-            // TODO: Save the patched entity.
-
-            // return Updated(client);
-            return StatusCode(HttpStatusCode.NotImplemented);
-        }
-
-        // DELETE: odata/Clients(5)
-        public IHttpActionResult Delete([FromODataUri] int key)
-        {
-            // TODO: Add delete logic here.
-
-            // return StatusCode(HttpStatusCode.NoContent);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
     }
 }

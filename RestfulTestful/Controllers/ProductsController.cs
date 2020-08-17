@@ -1,129 +1,143 @@
-﻿using System;
+﻿using RestfulTestful.SQLiteModels;
+using SQLite;
+using SQLiteNetExtensions.Extensions;
+using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using System.Web.Http.ModelBinding;
 using System.Web.Http.OData;
-using System.Web.Http.OData.Query;
-using System.Web.Http.OData.Routing;
-using RestfulTestful.SQLiteModels;
-using Microsoft.Data.OData;
 
 namespace RestfulTestful.Controllers
 {
-    /*
-    The WebApiConfig class may require additional changes to add a route for this controller. Merge these statements into the Register method of the WebApiConfig class as applicable. Note that OData URLs are case sensitive.
-
-    using System.Web.Http.OData.Builder;
-    using System.Web.Http.OData.Extensions;
-    using RestfulTestful.SQLiteModels;
-    ODataConventionModelBuilder builder = new ODataConventionModelBuilder();
-    builder.EntitySet<Product>("Products");
-    config.Routes.MapODataServiceRoute("odata", "odata", builder.GetEdmModel());
-    */
-    public class ProductsController : ODataController
+    [Authorize]
+    public class ProductsController : ApiController
     {
-        private static ODataValidationSettings _validationSettings = new ODataValidationSettings();
-
-        // GET: odata/Products
-        public IHttpActionResult GetProducts(ODataQueryOptions<Product> queryOptions)
+        // GET: api/Products
+        [AllowAnonymous]
+        [EnableQuery]
+        public IHttpActionResult Get()
         {
-            // validate the query.
-            try
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Product>().Any())
             {
-                queryOptions.Validate(_validationSettings);
+                return Ok<IEnumerable<Product>>(db.Table<Product>().ToList());
             }
-            catch (ODataException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-
-            // return Ok<IEnumerable<Product>>(products);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
 
-        // GET: odata/Products(5)
-        public IHttpActionResult GetProduct([FromODataUri] int key, ODataQueryOptions<Product> queryOptions)
+        // GET: api/Products/5
+        [AllowAnonymous]
+        public IHttpActionResult Get(int id)
         {
-            // validate the query.
-            try
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Product>().Where(c => c.ID.Equals(id)).Any())
             {
-                queryOptions.Validate(_validationSettings);
+                return Ok<Product>(db.Table<Product>().First(c => c.ID.Equals(id)));
             }
-            catch (ODataException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-
-            // return Ok<Product>(product);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
 
-        // PUT: odata/Products(5)
-        public IHttpActionResult Put([FromODataUri] int key, Delta<Product> delta)
+        // POST: api/Products
+        public IHttpActionResult Post([FromBody]Product product)
         {
-            Validate(delta.GetEntity());
-
-            if (!ModelState.IsValid)
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            product.TokenNumber = 1;
+            if (db.Insert(product) == 1)
             {
-                return BadRequest(ModelState);
+                return Ok<Product>(db.Table<Product>().Last(p => p.Name.Equals(product.Name) && p.Category.Equals(product.Category)));
             }
-
-            // TODO: Get the entity here.
-
-            // delta.Put(product);
-
-            // TODO: Save the patched entity.
-
-            // return Updated(product);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return InternalServerError();
         }
 
-        // POST: odata/Products
-        public IHttpActionResult Post(Product product)
+        // PUT: api/Products/5
+        public IHttpActionResult Put(int id, [FromBody]Product newProduct)
         {
-            if (!ModelState.IsValid)
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Product>().Where(p => p.ID.Equals(id)).Any())
             {
-                return BadRequest(ModelState);
+                Product oldProduct = db.Table<Product>().First(p => p.ID.Equals(id));
+                if (newProduct.TokenNumber.Equals(oldProduct))
+                {
+                    newProduct.TokenNumber++;
+                    if (db.Update(newProduct) == 1)
+                    {
+                        return Ok<Product>(newProduct);
+                    }
+                    return InternalServerError(new Exception("Couldn't update row."));
+                }
+                return BadRequest("Wrong token value.");
             }
-
-            // TODO: Add create logic here.
-
-            // return Created(product);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
 
-        // PATCH: odata/Products(5)
-        [AcceptVerbs("PATCH", "MERGE")]
-        public IHttpActionResult Patch([FromODataUri] int key, Delta<Product> delta)
+        public IHttpActionResult Patch(int id, [FromBody]Delta<Product> delta)
         {
-            Validate(delta.GetEntity());
-
-            if (!ModelState.IsValid)
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Product>().Where(p => p.ID.Equals(id)).Any())
             {
-                return BadRequest(ModelState);
+                Product product = db.Table<Product>().First(p => p.ID.Equals(id));
+                object requestToken = null;
+                if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
+                {
+                    if (product.TokenNumber.Equals((long)requestToken))
+                    {
+                        delta.Patch(product);
+                        product.TokenNumber++;
+                        if (db.Update(product) == 1)
+                        {
+                            return Ok<Product>(product);
+                        }
+                        return InternalServerError(new Exception("Couldn't update row."));
+                    }
+                    return BadRequest("Wrong token value.");
+                }
+                return InternalServerError(new Exception("Error during getting token value."));
             }
-
-            // TODO: Get the entity here.
-
-            // delta.Patch(product);
-
-            // TODO: Save the patched entity.
-
-            // return Updated(product);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            return NotFound();
         }
 
-        // DELETE: odata/Products(5)
-        public IHttpActionResult Delete([FromODataUri] int key)
+        // DELETE: api/Products/5
+        public IHttpActionResult Delete(int id, [FromBody]Delta<Product> delta)
         {
-            // TODO: Add delete logic here.
-
-            // return StatusCode(HttpStatusCode.NoContent);
-            return StatusCode(HttpStatusCode.NotImplemented);
+            string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
+            SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
+            if (db.Table<Product>().Where(p => p.ID.Equals(id)).Any())
+            {
+                Product product = db.GetAllWithChildren<Product>().First(p => p.ID.Equals(id));
+                object requestToken = null;
+                if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
+                {
+                    if (product.TokenNumber.Equals((long)requestToken))
+                    {
+                        foreach (Sale s in product.Sales)
+                        {
+                            if (!s.Payed)
+                            {
+                                return InternalServerError(new Exception("Cannot discontinue product with unpaid sales."));
+                            }
+                        }
+                        product.Discontinued = true;
+                        product.TokenNumber++;
+                        for (int i = 0; i < product.Sales.Count; i++)
+                        {
+                            product.Sales[i].Archieved = true;
+                            product.Sales[i].TokenNumber++;
+                        }
+                        db.UpdateWithChildren(product);
+                        return Ok<Product>(product);
+                    }
+                    return BadRequest("Wrong token value.");
+                }
+                return InternalServerError(new Exception("Error during getting token value."));
+            }
+            return NotFound();
         }
     }
 }
