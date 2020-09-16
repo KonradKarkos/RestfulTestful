@@ -1,9 +1,6 @@
 ﻿using RestfulTestful.SQLiteModels;
 using SQLite;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
 
 namespace RestfulTestful.Models
 {
@@ -21,9 +18,9 @@ namespace RestfulTestful.Models
             db.Dispose();
         }
 
-        public User ValidateUser(string username, string password)
+        public Employee ValidateUser(string username, string password)
         {
-            return db.Table<User>().FirstOrDefault(u => u.Name.Equals(username) && u.Password.Equals(password));
+            return db.Table<Employee>().FirstOrDefault(e => e.Name.Equals(username) && e.Password.Equals(password) && !e.Inactive);
         }
     }
 }

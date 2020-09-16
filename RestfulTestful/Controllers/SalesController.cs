@@ -1,11 +1,10 @@
-﻿using RestfulTestful.SQLiteModels;
+﻿using RestfulTestful.Models;
+using RestfulTestful.SQLiteModels;
 using SQLite;
 using SQLiteNetExtensions.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Web.Http;
 using System.Web.Http.OData;
 
@@ -14,7 +13,6 @@ namespace RestfulTestful.Controllers
     [Authorize]
     public class SalesController : ApiController
     {
-        // GET: api/Sales
         [EnableQuery]
         public IHttpActionResult Get()
         {
@@ -22,12 +20,17 @@ namespace RestfulTestful.Controllers
             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
             if (db.Table<Sale>().Any())
             {
-                return Ok<IEnumerable<Sale>>(db.GetAllWithChildren<Sale>());
+                List<SaleResponseModel> saleResponseModels = new List<SaleResponseModel>();
+                List<Sale> sales = db.GetAllWithChildren<Sale>();
+                foreach(Sale s in sales)
+                {
+                    saleResponseModels.Add(new SaleResponseModel(s, this.Url, false));
+                }
+                return Ok<IEnumerable<SaleResponseModel>>(saleResponseModels);
             }
             return NotFound();
         }
 
-        // GET: api/Sales/5
         [AllowAnonymous]
         public IHttpActionResult Get(int id)
         {
@@ -35,12 +38,11 @@ namespace RestfulTestful.Controllers
             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
             if (db.Table<Sale>().Where(c => c.ID.Equals(id)).Any())
             {
-                return Ok<Sale>(db.Table<Sale>().First(c => c.ID.Equals(id)));
+                return Ok<SaleResponseModel>(new SaleResponseModel(db.GetAllWithChildren<Sale>().First(c => c.ID.Equals(id)), this.Url, true));
             }
             return NotFound();
         }
 
-        // POST: api/Sales
         public IHttpActionResult Post([FromBody]Sale sale)
         {
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
@@ -48,25 +50,28 @@ namespace RestfulTestful.Controllers
             sale.TokenNumber = 1;
             DateTime now = DateTime.Now;
             sale.AddDate = now;
-            if (db.Table<Product>().Where(p => p.ID.Equals(sale.ProductID)).Any())
+            if (!POEChecker.AlreadyIsInDatabase(sale))
             {
-                Product product = db.Table<Product>().Where(p => p.ID.Equals(sale.ProductID)).First();
-                if (product.Quantity < sale.Quantity || product.Discontinued)
+                if (db.Table<Product>().Where(p => p.ID.Equals(sale.ProductID)).Any() && db.Table<Client>().Where(c => c.ID.Equals(sale.ClientID)).Any())
                 {
-                    product.Quantity = product.Quantity - sale.Quantity;
-                    product.TokenNumber++;
-                    if (db.Update(product) == 1 && db.Insert(sale) == 1)
+                    Product product = db.Table<Product>().Where(p => p.ID.Equals(sale.ProductID)).First();
+                    if (product.Quantity > sale.Quantity && !product.Discontinued)
                     {
-                        return Ok<Sale>(db.GetAllWithChildren<Sale>().Last(s => s.ProductID.Equals(sale.ProductID) && s.ClientID.Equals(sale.ClientID) && s.AddDate.Equals(now)));
+                        product.Quantity = product.Quantity - sale.Quantity;
+                        product.TokenNumber++;
+                        if (db.Update(product) == 1 && db.Insert(sale) == 1)
+                        {
+                            return Ok<SaleResponseModel>(new SaleResponseModel(db.GetAllWithChildren<Sale>().Last(s => s.ProductID.Equals(sale.ProductID) && s.ClientID.Equals(sale.ClientID) && s.AddDate.Equals(now)), this.Url, true));
+                        }
+                        return InternalServerError(new Exception("Couldn't insert row into database"));
                     }
-                    return InternalServerError();
+                    return BadRequest("Insufficient product quantity or product discontinued");
                 }
-                return BadRequest("Insufficient product quantity or product discontinued");
+                return BadRequest("Invalid product or/and client ID");
             }
-            return BadRequest("Invalid product ID");
+            return BadRequest("Object already is in database!");
         }
 
-        // PUT: api/Sales/5
         public IHttpActionResult Put(int id, [FromBody]Sale newSale)
         {
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
@@ -78,10 +83,11 @@ namespace RestfulTestful.Controllers
                 {
                     if (newSale.Quantity.Equals(oldSale.Quantity))
                     {
+                        newSale.ID = id;
                         newSale.TokenNumber++;
                         if (db.Update(newSale) == 1)
                         {
-                            return Ok<Sale>(newSale);
+                            return Ok<SaleResponseModel>(new SaleResponseModel(db.GetAllWithChildren<Sale>().First(s => s.ID.Equals(id)), this.Url, true));
                         }
                         return InternalServerError(new Exception("Couldn't update row."));
                     }
@@ -107,13 +113,14 @@ namespace RestfulTestful.Controllers
                         object newQuantity = null;
                         if (delta.TryGetPropertyValue("Quantity", out newQuantity))
                         {
-                            if (sale.Quantity.Equals((long)newQuantity) || newQuantity == null)
+                            if (sale.Quantity.Equals((long)newQuantity) || (long)newQuantity == 0)
                             {
                                 delta.Patch(sale);
+                                sale.ID = id;
                                 sale.TokenNumber++;
                                 if (db.Update(sale) == 1)
                                 {
-                                    return Ok<Sale>(sale);
+                                    return Ok<SaleResponseModel>(new SaleResponseModel(sale, this.Url, true));
                                 }
                                 return InternalServerError(new Exception("Couldn't update row."));
                             }
@@ -128,7 +135,6 @@ namespace RestfulTestful.Controllers
             return NotFound();
         }
 
-        // DELETE: api/Sales/5
         public IHttpActionResult Delete(int id, [FromBody]Delta<Sale> delta)
         {
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
@@ -147,17 +153,18 @@ namespace RestfulTestful.Controllers
                             {
                                 return InternalServerError(new Exception("Couldn't delete row."));
                             }
+                            return Ok<Sale>(sale);
                         }
                         else
                         {
-                            if (sale.Payed)
+                            if (!sale.Payed)
                             {
                                 Product product = db.Table<Product>().Where(p => p.ID.Equals(sale.ProductID)).First();
                                 product.Quantity = product.Quantity + sale.Quantity;
                                 product.TokenNumber++;
                                 if(db.Update(product)!=1)
                                 {
-                                    return InternalServerError(new Exception("Couldn't update product after archievieng unpaid sale."));
+                                    return InternalServerError(new Exception("Couldn't update product quantity with amount from unpaid sale."));
                                 }
                             }
                             sale.TokenNumber++;
@@ -167,13 +174,23 @@ namespace RestfulTestful.Controllers
                                 return InternalServerError(new Exception("Couldn't update sale."));
                             }
                         }
-                        return Ok<Sale>(sale);
+                        return Ok<SaleResponseModel>(new SaleResponseModel(sale, this.Url, true));
                     }
                     return BadRequest("Wrong token value.");
                 }
                 return InternalServerError(new Exception("Error during getting token value."));
             }
             return NotFound();
+        }
+        private List<HATEOASLinkResponseModel> ProduceLinks(long saleID)
+        {
+            return new List<HATEOASLinkResponseModel>()
+            {
+                new HATEOASLinkResponseModel(this.Url.Link("HATEOAS", new {id = saleID}), "self", "GET"),
+                new HATEOASLinkResponseModel(this.Url.Link("HATEOAS", new {id = saleID}), "update_client", "PUT"),
+                new HATEOASLinkResponseModel(this.Url.Link("HATEOAS", new {id = saleID}), "partially_update_client", "PATCH"),
+                new HATEOASLinkResponseModel(this.Url.Link("HATEOAS", new {id = saleID}), "archieve_or_delete_archieved_client", "DELETE")
+            };
         }
     }
 }

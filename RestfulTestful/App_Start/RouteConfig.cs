@@ -18,6 +18,10 @@ namespace RestfulTestful
                 url: "{controller}/{action}/{id}",
                 defaults: new { controller = "Home", action = "Index", id = UrlParameter.Optional }
             );
+            routes.MapRoute(
+                name: "HATEOAS",
+                url: "api/{controller}/{id}"
+            );
         }
     }
 }

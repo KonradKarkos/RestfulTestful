@@ -1,10 +1,6 @@
 ﻿using Microsoft.Owin.Security.OAuth;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using System.Web;
 
 namespace RestfulTestful.Models
 {
@@ -21,7 +17,7 @@ namespace RestfulTestful.Models
                 var user = repository.ValidateUser(context.UserName, context.Password);
                 if (user == null)
                 {
-                    context.SetError("invalid_grant", "Username or/and password are incorrect");
+                    context.SetError("invalid_grant", "Username or/and password are incorrect or given employee has been deactivated");
                     return;
                 }
                 var identity = new ClaimsIdentity(context.Options.AuthenticationType);

@@ -1,93 +1,97 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using RestfulTestful.Models;
 using RestfulTestful.SQLiteModels;
 using SQLite;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Web.Http;
 using System.Web.Http.OData;
-using System.Web.Security;
 
 namespace RestfulTestful.Controllers
 {
     [System.Web.Http.Authorize(Roles ="Admin")]
-    public class RegistrationController : ApiController
+    public class EmployeesController : ApiController
     {
-        // GET: api/Registration
         [EnableQuery]
         public IHttpActionResult Get()
         {
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
-            if (db.Table<User>().Any())
+            if (db.Table<Employee>().Any())
             {
-                return Ok<IEnumerable<User>>(db.Table<User>().ToList());
+                List<EmployeeResponseModel> employeeResponseModels = new List<EmployeeResponseModel>();
+                List<Employee> employees = db.Table<Employee>().ToList();
+                foreach(Employee e in employees)
+                {
+                    employeeResponseModels.Add(new EmployeeResponseModel(e, this.Url));
+                }
+                return Ok<IEnumerable<EmployeeResponseModel>>(employeeResponseModels);
             }
             return NotFound();
         }
 
-        // GET: api/Registration/5
         public IHttpActionResult Get(int id)
         {
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
-            if (db.Table<Product>().Where(c => c.ID.Equals(id)).Any())
+            if (db.Table<Employee>().Where(c => c.ID.Equals(id)).Any())
             {
-                return Ok<Product>(db.Table<Product>().First(c => c.ID.Equals(id)));
+                return Ok<EmployeeResponseModel>(new EmployeeResponseModel(db.Table<Employee>().First(c => c.ID.Equals(id)), this.Url));
             }
             return NotFound();
         }
 
-        // POST: api/Registration
-        public IHttpActionResult Post([FromBody]User user)
+        public IHttpActionResult Post([FromBody]Employee employee)
         {
-            if (user.Name != null && user.Name.Length > 0)
+            if (employee.Name != null && employee.Name.Length > 0)
             {
-                if (user.Password != null && user.Password.Length > 6 &&
-                    Regex.IsMatch(user.Password, @"[!,@,#,$,%,^,&,*,?,_,~,-,£,(,)]") &&
-                    Regex.IsMatch(user.Password, @"\d+") &&
-                    Regex.IsMatch(user.Password, @"[a-z]") &&
-                    Regex.IsMatch(user.Password, @"[A-Z]"))
+                if (employee.Password != null && employee.Password.Length > 6 &&
+                    Regex.IsMatch(employee.Password, @"[!,@,#,$,%,^,&,*,?,_,~,-,£,(,)]") &&
+                    Regex.IsMatch(employee.Password, @"\d+") &&
+                    Regex.IsMatch(employee.Password, @"[a-z]") &&
+                    Regex.IsMatch(employee.Password, @"[A-Z]"))
                 {
                     string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
                     SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
-                    user.TokenNumber = 1;
-                    if (db.Insert(user) == 1)
+                    employee.TokenNumber = 1;
+                    if (POEChecker.AlreadyIsInDatabase(employee))
                     {
-                        return Ok<User>(db.Table<User>().Last(u => u.Name.Equals(user.Name) && u.Password.Equals(user.Password)));
+                        if (db.Insert(employee) == 1)
+                        {
+                            return Ok<EmployeeResponseModel>(new EmployeeResponseModel(db.Table<Employee>().Last(e => e.Name.Equals(employee.Name) && e.Password.Equals(employee.Password)), this.Url));
+                        }
+                        return InternalServerError();
                     }
-                    return InternalServerError();
+                    return BadRequest("Object already is in database!");
                 }
                 return BadRequest("Your password must be at least 6 characters long and must contain at least one special, at least one number, at least one small letter and at least one capital letter");
             }
             return BadRequest("Your nickname is too short");
         }
 
-        // PUT: api/Registration/5
-        public IHttpActionResult Put(int id, [FromBody]User newUser)
+        public IHttpActionResult Put(int id, [FromBody]Employee newEmployee)
         {
-            if (newUser != null && newUser.Name.Length > 0)
+            if (newEmployee != null && newEmployee.Name.Length > 0)
             {
-                if (newUser.Password != null && newUser.Password.Length > 6 &&
-                    Regex.IsMatch(newUser.Password, @".[!,@,#,$,%,^,&,*,?,_,~,-,£,(,)]") &&
-                    Regex.IsMatch(newUser.Password, @"\d+") &&
-                    Regex.IsMatch(newUser.Password, @"[a-z]") &&
-                    Regex.IsMatch(newUser.Password, @"[A-Z]"))
+                if (newEmployee.Password != null && newEmployee.Password.Length > 6 &&
+                    Regex.IsMatch(newEmployee.Password, @".[!,@,#,$,%,^,&,*,?,_,~,-,£,(,)]") &&
+                    Regex.IsMatch(newEmployee.Password, @"\d+") &&
+                    Regex.IsMatch(newEmployee.Password, @"[a-z]") &&
+                    Regex.IsMatch(newEmployee.Password, @"[A-Z]"))
                 {
                     string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
                     SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
-                    if (db.Table<User>().Where(u => u.ID.Equals(id)).Any())
+                    if (db.Table<Employee>().Where(e => e.ID.Equals(id)).Any())
                     {
                         Product oldProduct = db.Table<Product>().First(p => p.ID.Equals(id));
-                        if (newUser.TokenNumber.Equals(oldProduct))
+                        if (newEmployee.TokenNumber.Equals(oldProduct))
                         {
-                            newUser.TokenNumber++;
-                            if (db.Update(newUser) == 1)
+                            newEmployee.TokenNumber++;
+                            newEmployee.ID = id;
+                            if (db.Update(newEmployee) == 1)
                             {
-                                return Ok<User>(newUser);
+                                return Ok<EmployeeResponseModel>(new EmployeeResponseModel(newEmployee, this.Url));
                             }
                             return InternalServerError(new Exception("Couldn't update row."));
                         }
@@ -99,8 +103,9 @@ namespace RestfulTestful.Controllers
             }
             return BadRequest("Nickname is too short");
         }
+
         [System.Web.Http.Authorize(Roles = "Employee, Admin")]
-        public IHttpActionResult Patch(int id, [FromBody]Delta<User> delta)
+        public IHttpActionResult Patch(int id, [FromBody]Delta<Employee> delta)
         {
             object name = null;
             if (delta.TryGetPropertyValue("Name", out name))
@@ -118,19 +123,20 @@ namespace RestfulTestful.Controllers
                         {
                             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
                             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
-                            if (db.Table<User>().Where(p => p.ID.Equals(id)).Any())
+                            if (db.Table<Employee>().Where(e => e.ID.Equals(id)).Any())
                             {
-                                User user = db.Table<User>().First(u => u.ID.Equals(id));
+                                Employee employee = db.Table<Employee>().First(e => e.ID.Equals(id));
                                 object requestToken = null;
                                 if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
                                 {
-                                    if (user.TokenNumber.Equals((long)requestToken))
+                                    if (employee.TokenNumber.Equals((long)requestToken))
                                     {
-                                        delta.Patch(user);
-                                        user.TokenNumber++;
-                                        if (db.Update(user) == 1)
+                                        delta.Patch(employee);
+                                        employee.ID = id;
+                                        employee.TokenNumber++;
+                                        if (db.Update(employee) == 1)
                                         {
-                                            return Ok<User>(user);
+                                            return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url));
                                         }
                                         return InternalServerError(new Exception("Couldn't update row."));
                                     }
@@ -148,24 +154,33 @@ namespace RestfulTestful.Controllers
             }
             return InternalServerError(new Exception("Error during getting nickname value."));
         }
-
-        // DELETE: api/Registration/5
-        public IHttpActionResult Delete(int id, [FromBody]Delta<User> delta)
+        public IHttpActionResult Delete(int id, [FromBody]Delta<Employee> delta)
         {
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
-            if (db.Table<User>().Where(u => u.ID.Equals(id)).Any())
+            if (db.Table<Employee>().Where(u => u.ID.Equals(id)).Any())
             {
-                User user = db.Table<User>().First(p => p.ID.Equals(id));
+                Employee employee = db.Table<Employee>().First(e => e.ID.Equals(id));
                 object requestToken = null;
                 if (delta.TryGetPropertyValue("TokenNumber", out requestToken))
                 {
-                    if (user.TokenNumber.Equals((long)requestToken))
+                    if (employee.TokenNumber.Equals((long)requestToken))
                     {
-                        user.Inactive = true;
-                        user.TokenNumber++;
-                        db.Update(user);
-                        return Ok<User>(user);
+                        if (employee.Inactive)
+                        {
+                            if(db.Delete(employee)!=1)
+                            {
+                                return InternalServerError(new Exception("Couldn't delete row."));
+                            }
+                            return Ok<Employee>(employee);
+                        }
+                        else
+                        {
+                            employee.Inactive = true;
+                            employee.TokenNumber++;
+                            db.Update(employee);
+                        }
+                        return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url));
                     }
                     return BadRequest("Wrong token value.");
                 }

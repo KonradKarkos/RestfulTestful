@@ -20,7 +20,8 @@ namespace RestfulTestful.App_Start
             db.CreateTable<Product>();
             db.CreateTable<Client>();
             db.CreateTable<Sale>();
-            db.CreateTable<User>();
+            db.CreateTable<Employee>();
+            //db.Insert(new Employee() { Name="admin", Password="admin1", Inactive=false});
         }
         public static bool Hacked { get; private set; }
 

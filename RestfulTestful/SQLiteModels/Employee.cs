@@ -1,13 +1,9 @@
 ﻿using SQLite;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
 
 namespace RestfulTestful.SQLiteModels
 {
-    [Table("User")]
-    public class User
+    [Table("Employee")]
+    public class Employee
     {
         [PrimaryKey, AutoIncrement]
         public long ID { get; set; }
