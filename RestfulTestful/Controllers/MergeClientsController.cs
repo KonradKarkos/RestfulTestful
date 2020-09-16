@@ -9,7 +9,7 @@ namespace RestfulTestful.Controllers
 {
     public class MergeClientsController : ApiController
     {
-        public IHttpActionResult Put(int id, int clientToAbsorbID)
+        public IHttpActionResult Post(int id, int clientToAbsorbID)
         {
             bool roolback = false;
             string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");

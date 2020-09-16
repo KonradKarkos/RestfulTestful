@@ -22,9 +22,21 @@ namespace RestfulTestful.Controllers
             {
                 List<EmployeeResponseModel> employeeResponseModels = new List<EmployeeResponseModel>();
                 List<Employee> employees = db.Table<Employee>().ToList();
-                foreach(Employee e in employees)
+                long nextEmployeeID = 0;
+                long previousEmployeeID = 0;
+                for (int i=0;i<employees.Count;i++)
                 {
-                    employeeResponseModels.Add(new EmployeeResponseModel(e, this.Url));
+                    if(i>0)
+                    {
+                        previousEmployeeID = employees[i - 1].ID;
+                    }
+                    if(i < employees.Count-1)
+                    {
+                        nextEmployeeID = employees[i + 1].ID;
+                    }
+                    employeeResponseModels.Add(new EmployeeResponseModel(employees[i], this.Url, nextEmployeeID, previousEmployeeID));
+                    nextEmployeeID = 0;
+                    previousEmployeeID = 0;
                 }
                 return Ok<IEnumerable<EmployeeResponseModel>>(employeeResponseModels);
             }
@@ -37,7 +49,19 @@ namespace RestfulTestful.Controllers
             SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
             if (db.Table<Employee>().Where(c => c.ID.Equals(id)).Any())
             {
-                return Ok<EmployeeResponseModel>(new EmployeeResponseModel(db.Table<Employee>().First(c => c.ID.Equals(id)), this.Url));
+                Employee employee = db.Table<Employee>().First(c => c.ID.Equals(id));
+                long nextEmployeeID = 0;
+                long previousEmployeeID = 0;
+                int employeeIndex = db.Table<Employee>().ToList().IndexOf(employee);
+                if (employeeIndex > 0)
+                {
+                    previousEmployeeID = db.Table<Employee>().ToList()[employeeIndex - 1].ID;
+                }
+                if (employeeIndex < db.Table<Employee>().Count() - 1)
+                {
+                    nextEmployeeID = db.Table<Employee>().ToList()[employeeIndex + 1].ID;
+                }
+                return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url, nextEmployeeID, previousEmployeeID));
             }
             return NotFound();
         }
@@ -55,11 +79,22 @@ namespace RestfulTestful.Controllers
                     string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Personal), "RestfulTestfulFiles");
                     SQLiteConnection db = new SQLiteConnection(System.IO.Path.Combine(path, "RestfulTestfulDatabase.db"));
                     employee.TokenNumber = 1;
-                    if (POEChecker.AlreadyIsInDatabase(employee))
+                    if (!POEChecker.AlreadyIsInDatabase(employee))
                     {
                         if (db.Insert(employee) == 1)
                         {
-                            return Ok<EmployeeResponseModel>(new EmployeeResponseModel(db.Table<Employee>().Last(e => e.Name.Equals(employee.Name) && e.Password.Equals(employee.Password)), this.Url));
+                            long nextEmployeeID = 0;
+                            long previousEmployeeID = 0;
+                            int employeeIndex = db.Table<Employee>().ToList().IndexOf(employee);
+                            if (employeeIndex > 0)
+                            {
+                                previousEmployeeID = db.Table<Employee>().ToList()[employeeIndex - 1].ID;
+                            }
+                            if (employeeIndex < db.Table<Employee>().Count() - 1)
+                            {
+                                nextEmployeeID = db.Table<Employee>().ToList()[employeeIndex + 1].ID;
+                            }
+                            return Ok<EmployeeResponseModel>(new EmployeeResponseModel(db.Table<Employee>().Last(e => e.Name.Equals(employee.Name) && e.Password.Equals(employee.Password)), this.Url, nextEmployeeID, previousEmployeeID));
                         }
                         return InternalServerError();
                     }
@@ -91,7 +126,18 @@ namespace RestfulTestful.Controllers
                             newEmployee.ID = id;
                             if (db.Update(newEmployee) == 1)
                             {
-                                return Ok<EmployeeResponseModel>(new EmployeeResponseModel(newEmployee, this.Url));
+                                long nextEmployeeID = 0;
+                                long previousEmployeeID = 0;
+                                int employeeIndex = db.Table<Employee>().ToList().IndexOf(newEmployee);
+                                if (employeeIndex > 0)
+                                {
+                                    previousEmployeeID = db.Table<Employee>().ToList()[employeeIndex - 1].ID;
+                                }
+                                if (employeeIndex < db.Table<Employee>().Count() - 1)
+                                {
+                                    nextEmployeeID = db.Table<Employee>().ToList()[employeeIndex + 1].ID;
+                                }
+                                return Ok<EmployeeResponseModel>(new EmployeeResponseModel(newEmployee, this.Url, nextEmployeeID, previousEmployeeID));
                             }
                             return InternalServerError(new Exception("Couldn't update row."));
                         }
@@ -136,7 +182,18 @@ namespace RestfulTestful.Controllers
                                         employee.TokenNumber++;
                                         if (db.Update(employee) == 1)
                                         {
-                                            return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url));
+                                            long nextEmployeeID = 0;
+                                            long previousEmployeeID = 0;
+                                            int employeeIndex = db.Table<Employee>().ToList().IndexOf(employee);
+                                            if(employeeIndex > 0)
+                                            {
+                                                previousEmployeeID = db.Table<Employee>().ToList()[employeeIndex - 1].ID;
+                                            }
+                                            if(employeeIndex < db.Table<Employee>().Count()-1)
+                                            {
+                                                nextEmployeeID = db.Table<Employee>().ToList()[employeeIndex + 1].ID;
+                                            }
+                                            return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url, nextEmployeeID, previousEmployeeID));
                                         }
                                         return InternalServerError(new Exception("Couldn't update row."));
                                     }
@@ -180,7 +237,18 @@ namespace RestfulTestful.Controllers
                             employee.TokenNumber++;
                             db.Update(employee);
                         }
-                        return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url));
+                        long nextEmployeeID = 0;
+                        long previousEmployeeID = 0;
+                        int employeeIndex = db.Table<Employee>().ToList().IndexOf(employee);
+                        if (employeeIndex > 0)
+                        {
+                            previousEmployeeID = db.Table<Employee>().ToList()[employeeIndex - 1].ID;
+                        }
+                        if (employeeIndex < db.Table<Employee>().Count() - 1)
+                        {
+                            nextEmployeeID = db.Table<Employee>().ToList()[employeeIndex + 1].ID;
+                        }
+                        return Ok<EmployeeResponseModel>(new EmployeeResponseModel(employee, this.Url, nextEmployeeID, previousEmployeeID));
                     }
                     return BadRequest("Wrong token value.");
                 }
